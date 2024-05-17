@@ -22,6 +22,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "stdio.h"
+#include "stdlib.h"
 #include "LCD.h"
 /* USER CODE END Includes */
 
@@ -43,12 +44,19 @@
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc1;
 
+TIM_HandleTypeDef htim2;
+
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
 
-float soilHumidity;
+float soilHumidity = 5;
 uint32_t readValue;
+uint8_t uartMessage[1];
+char lcdString[32] = ""; 
+uint16_t moisture_pin;
+
+int counter = 0;
 
 /* USER CODE END PV */
 
@@ -57,12 +65,13 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_ADC1_Init(void);
+static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-//int readValue;
+
 /* USER CODE END 0 */
 
 /**
@@ -95,19 +104,23 @@ int main(void)
   MX_GPIO_Init();
   MX_USART1_UART_Init();
   MX_ADC1_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
 	//HAL_ADC_Start(&hadc1);
-		uint8_t data[1];
+	
 
 	lcd_init(_LCD_4BIT, _LCD_FONT_5x8, _LCD_2LINE);
 
 	int i = 0;
-	char yazi[32] = ""; // lcd ekrana yazmak icin
+// lcd ekrana yazmak icin
 
 	lcd_print(1, 1, " ...");
 	HAL_Delay(1000);
 	lcd_clear();
 	HAL_ADCEx_Calibration_Start(&hadc1);
+	
+	// Initiliaze the timer
+	HAL_TIM_Base_Start_IT(&htim2);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -116,15 +129,8 @@ int main(void)
   {
 		HAL_ADC_Start_IT(&hadc1);
 
-		sprintf(yazi, " %.2f", soilHumidity);//int i string yapiyor
-		lcd_print(1,1, " Soil Moisture (%)");
-    lcd_print(2, 1, yazi);
-	  HAL_Delay(10);
 
-    HAL_ADC_Stop_IT(&hadc1);
-		HAL_Delay(10);
-
-		//// soil sensor
+		
 		
 		/*
 	  HAL_ADC_Start(&hadc1);
@@ -259,6 +265,51 @@ static void MX_ADC1_Init(void)
 }
 
 /**
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM2_Init(void)
+{
+
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 15;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 49999;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
+
+  /* USER CODE END TIM2_Init 2 */
+
+}
+
+/**
   * @brief USART1 Initialization Function
   * @param None
   * @retval None
@@ -326,22 +377,50 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
+void printToTheLCD() {
+	
+		sprintf(lcdString, " %.2f", soilHumidity);//int i string yapiyor
+		lcd_print(1,1, " Moisture: ");
+    lcd_print(2, 1, lcdString);
+	
+}
+
+void checkMoisture() {
+	
+			if (soilHumidity > 10 && soilHumidity < 50) {
+			moisture_pin = GPIO_PIN_15;
+			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_RESET);
+			}
+			
+			else {
+			moisture_pin = GPIO_PIN_14;
+			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, GPIO_PIN_RESET);
+			}
+}
+	
+
+
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
-  if(hadc == &hadc1) {
-		readValue = HAL_ADC_GetValue(&hadc1);
-		soilHumidity = 100*((float)readValue/4096);
 		
-		if (soilHumidity > 10 && soilHumidity < 50) {
-			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, GPIO_PIN_SET);
-			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_RESET);
+		uint32_t newValue = HAL_ADC_GetValue(&hadc1);
+		if (abs(newValue - readValue) < 100) {
+			return;
 		}
-		else {
-			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, GPIO_PIN_RESET);
-			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_SET);
-		}
+		readValue = newValue;
+		soilHumidity = (100*((float)readValue/4096));
+
+}
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+	
+		printToTheLCD();
+		checkMoisture();
 		
-	}
+		HAL_GPIO_TogglePin(GPIOB, moisture_pin);
+		
+   
 }
 
 /* USER CODE END 4 */
