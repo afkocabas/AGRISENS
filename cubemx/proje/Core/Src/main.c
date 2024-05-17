@@ -104,7 +104,7 @@ int main(void)
 	int i = 0;
 	char yazi[32] = ""; // lcd ekrana yazmak icin
 
-	lcd_print(1, 1, " started");
+	lcd_print(1, 1, " ...");
 	HAL_Delay(1000);
 	lcd_clear();
 	HAL_ADCEx_Calibration_Start(&hadc1);
@@ -245,7 +245,7 @@ static void MX_ADC1_Init(void)
 
   /** Configure Regular Channel
   */
-  sConfig.Channel = ADC_CHANNEL_3;
+  sConfig.Channel = ADC_CHANNEL_0;
   sConfig.Rank = ADC_REGULAR_RANK_1;
   sConfig.SamplingTime = ADC_SAMPLETIME_1CYCLE_5;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
