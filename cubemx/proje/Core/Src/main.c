@@ -50,11 +50,13 @@ UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
 
-float soilHumidity = 5;
+float soilHumidity = 50;
 uint32_t readValue;
-uint8_t uartMessage[1];
+uint8_t uartMessage[1] = "m";
 char lcdString[32] = ""; 
 uint16_t moisture_pin;
+
+int uart_message_recieved = 0;
 
 int counter = 0;
 
@@ -117,20 +119,24 @@ int main(void)
 	lcd_print(1, 1, " ...");
 	HAL_Delay(1000);
 	lcd_clear();
+	
+	
 	HAL_ADCEx_Calibration_Start(&hadc1);
 	
-	// Initiliaze the timer
 	HAL_TIM_Base_Start_IT(&htim2);
+	HAL_UART_Init(&huart1);
+	HAL_UART_Receive_IT(&huart1, uartMessage, sizeof(uartMessage));
+	
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-		HAL_ADC_Start_IT(&hadc1);
-
-
 		
+		HAL_ADC_Start_IT(&hadc1);
+		
+	
 		
 		/*
 	  HAL_ADC_Start(&hadc1);
@@ -325,7 +331,7 @@ static void MX_USART1_UART_Init(void)
 
   /* USER CODE END USART1_Init 1 */
   huart1.Instance = USART1;
-  huart1.Init.BaudRate = 115200;
+  huart1.Init.BaudRate = 9600;
   huart1.Init.WordLength = UART_WORDLENGTH_8B;
   huart1.Init.StopBits = UART_STOPBITS_1;
   huart1.Init.Parity = UART_PARITY_NONE;
@@ -377,11 +383,36 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
-void printToTheLCD() {
+void lcd_empty() {
+		lcd_print(1,1, "                       ");
+		lcd_print(2,1, "                       ");	
 	
-		sprintf(lcdString, " %.2f", soilHumidity);//int i string yapiyor
-		lcd_print(1,1, " Moisture: ");
-    lcd_print(2, 1, lcdString);
+}
+
+
+void printToTheLCD() {
+		
+		switch(uartMessage[0]) {
+			case 'm': {
+					lcd_empty();
+					sprintf(lcdString, " %.2f", soilHumidity);//int i string yapiyor
+					lcd_print(1,1, " Moisture(%) ");
+					lcd_print(2, 1, lcdString);	
+					break;
+				
+			}
+			
+			case 'w': {
+				lcd_empty();
+				sprintf(lcdString, " value");
+				lcd_print(1,1, " Water Tank(%): ");
+				lcd_print(2,1, lcdString);
+				break;
+				
+			}
+			
+		}
+		
 	
 }
 
@@ -404,17 +435,31 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
 		
 		uint32_t newValue = HAL_ADC_GetValue(&hadc1);
-		if (abs(newValue - readValue) < 100) {
+		if (newValue - readValue < 50) {
 			return;
 		}
 		readValue = newValue;
 		soilHumidity = (100*((float)readValue/4096));
+		
+		HAL_ADC_Start_IT(&hadc1);
+		
 
+}
+
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+	
+		HAL_UART_Receive_IT(&huart1, uartMessage, sizeof(uartMessage));
+	
+		printToTheLCD();
+
+	
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-	
+
 		printToTheLCD();
 		checkMoisture();
 		
