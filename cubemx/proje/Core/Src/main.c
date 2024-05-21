@@ -126,6 +126,7 @@ int main(void)
 	HAL_TIM_Base_Start_IT(&htim2);
 	HAL_UART_Init(&huart1);
 	HAL_UART_Receive_IT(&huart1, uartMessage, sizeof(uartMessage));
+	HAL_ADC_Start_IT(&hadc1);
 	
   /* USER CODE END 2 */
 
@@ -133,49 +134,12 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-		
-		HAL_ADC_Start_IT(&hadc1);
-		
-	
-		
-		/*
-	  HAL_ADC_Start(&hadc1);
-	
-		HAL_ADC_PollForConversion(&hadc1,100);
-	  readValue = HAL_ADC_GetValue(&hadc1);
-				sprintf(yazi, "   %d",readValue);
-				lcd_print(2,1,yazi);
 
-HAL_ADC_Stop(&hadc1);	
-		///////////////////////
-		
-		
-		HAL_Delay(1000);
-		*/
-		
-		
-		//// LCD EKRANA YAZI YAZMAK ICIN
-	/*	HAL_UART_Transmit(&huart1, data, sizeof(data), HAL_MAX_DELAY);
-		HAL_Delay(500);
-		HAL_UART_Receive(&huart1, data, sizeof(data), HAL_MAX_DELAY);
-		
-		if(data[0] =='A' || data[0] =='a'){
-			lcd_clear();
-			lcd_print(1,1,"  all is shown");
-		}else if(data[0] =='T'||data[0] =='t'){
-			lcd_clear();
-			lcd_print(1,1,"  temprature");
-		}
-	*/
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
 		
-	/*	i++;
-		sprintf(yazi, "%d",i);
-		lcd_print(1,1,yazi);
-		HAL_Delay(30);
-		lcd_clear();*/
   }
   /* USER CODE END 3 */
 }
@@ -245,7 +209,7 @@ static void MX_ADC1_Init(void)
   */
   hadc1.Instance = ADC1;
   hadc1.Init.ScanConvMode = ADC_SCAN_DISABLE;
-  hadc1.Init.ContinuousConvMode = DISABLE;
+  hadc1.Init.ContinuousConvMode = ENABLE;
   hadc1.Init.DiscontinuousConvMode = DISABLE;
   hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
   hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
@@ -441,7 +405,10 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 		readValue = newValue;
 		soilHumidity = (100*((float)readValue/4096));
 		
+		
 		HAL_ADC_Start_IT(&hadc1);
+		
+		
 		
 
 }
@@ -459,7 +426,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-
+		
 		printToTheLCD();
 		checkMoisture();
 		
