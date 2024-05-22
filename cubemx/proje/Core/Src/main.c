@@ -43,6 +43,7 @@
 
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc1;
+DMA_HandleTypeDef hdma_adc1;
 
 TIM_HandleTypeDef htim2;
 
@@ -51,20 +52,31 @@ UART_HandleTypeDef huart1;
 /* USER CODE BEGIN PV */
 
 float soilHumidity = 50;
-uint32_t readValue;
+float waterLevel = 50;
+
+
+uint32_t adcBuffer[2];
+
+uint32_t adcWaterValue;
+uint32_t adcMoistureValue;
+
+
 uint8_t uartMessage[1] = "m";
 char lcdString[32] = ""; 
+
+
 uint16_t moisture_pin;
 
-int uart_message_recieved = 0;
-
 int counter = 0;
+
+
 
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_DMA_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_TIM2_Init(void);
@@ -104,29 +116,26 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_USART1_UART_Init();
   MX_ADC1_Init();
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
-	//HAL_ADC_Start(&hadc1);
 	
-
 	lcd_init(_LCD_4BIT, _LCD_FONT_5x8, _LCD_2LINE);
 
-	int i = 0;
-// lcd ekrana yazmak icin
 
 	lcd_print(1, 1, " ...");
 	HAL_Delay(1000);
 	lcd_clear();
 	
 	
-	HAL_ADCEx_Calibration_Start(&hadc1);
-	
 	HAL_TIM_Base_Start_IT(&htim2);
 	HAL_UART_Init(&huart1);
 	HAL_UART_Receive_IT(&huart1, uartMessage, sizeof(uartMessage));
-	HAL_ADC_Start_IT(&hadc1);
+	//HAL_ADC_Start_IT(&hadc1);
+	HAL_ADC_Start_DMA(&hadc1, adcBuffer, 2);
+
 	
   /* USER CODE END 2 */
 
@@ -134,7 +143,6 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-
 
     /* USER CODE END WHILE */
 
@@ -208,12 +216,12 @@ static void MX_ADC1_Init(void)
   /** Common config
   */
   hadc1.Instance = ADC1;
-  hadc1.Init.ScanConvMode = ADC_SCAN_DISABLE;
+  hadc1.Init.ScanConvMode = ADC_SCAN_ENABLE;
   hadc1.Init.ContinuousConvMode = ENABLE;
   hadc1.Init.DiscontinuousConvMode = DISABLE;
   hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
   hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
-  hadc1.Init.NbrOfConversion = 1;
+  hadc1.Init.NbrOfConversion = 2;
   if (HAL_ADC_Init(&hadc1) != HAL_OK)
   {
     Error_Handler();
@@ -223,7 +231,16 @@ static void MX_ADC1_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_0;
   sConfig.Rank = ADC_REGULAR_RANK_1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_1CYCLE_5;
+  sConfig.SamplingTime = ADC_SAMPLETIME_55CYCLES_5;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_1;
+  sConfig.Rank = ADC_REGULAR_RANK_2;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -313,6 +330,22 @@ static void MX_USART1_UART_Init(void)
 }
 
 /**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA1_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA1_Channel1_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel1_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel1_IRQn);
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -368,7 +401,7 @@ void printToTheLCD() {
 			
 			case 'w': {
 				lcd_empty();
-				sprintf(lcdString, " value");
+				sprintf(lcdString, " %.2f", waterLevel);
 				lcd_print(1,1, " Water Tank(%): ");
 				lcd_print(2,1, lcdString);
 				break;
@@ -397,19 +430,30 @@ void checkMoisture() {
 
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
-		
-		uint32_t newValue = HAL_ADC_GetValue(&hadc1);
-		if (newValue - readValue < 50) {
-			return;
-		}
-		readValue = newValue;
-		soilHumidity = (100*((float)readValue/4096));
-		
-		
-		HAL_ADC_Start_IT(&hadc1);
-		
-		
-		
+
+//		if(hadc == &hadc1) {
+//			
+//			uint32_t newValue = HAL_ADC_GetValue(&hadc1);
+//			if (newValue - adcMoistureValue < 50) {
+//				return;
+//			}
+//			adcMoistureValue = newValue;
+//			soilHumidity = (100*((float)adcMoistureValue/4096));				
+//			
+//		}
+//		
+	
+			if (hadc->Instance == ADC1) {
+				
+				adcMoistureValue = adcBuffer[0];
+				adcWaterValue = adcBuffer[1];
+				counter++;
+				
+				waterLevel = (100*((float)adcWaterValue/4096));
+				soilHumidity = (100*((float)adcMoistureValue/4096));
+				
+				
+			}
 
 }
 
