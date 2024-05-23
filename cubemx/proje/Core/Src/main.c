@@ -54,21 +54,15 @@ UART_HandleTypeDef huart1;
 float soilHumidity = 50;
 float waterLevel = 50;
 
-
 uint32_t adcBuffer[2];
 
 uint32_t adcWaterValue;
 uint32_t adcMoistureValue;
 
-
 uint8_t uartMessage[1] = "m";
 char lcdString[32] = ""; 
 
-
 uint16_t moisture_pin;
-
-int counter = 0;
-
 
 
 /* USER CODE END PV */
@@ -133,7 +127,6 @@ int main(void)
 	HAL_TIM_Base_Start_IT(&htim2);
 	HAL_UART_Init(&huart1);
 	HAL_UART_Receive_IT(&huart1, uartMessage, sizeof(uartMessage));
-	//HAL_ADC_Start_IT(&hadc1);
 	HAL_ADC_Start_DMA(&hadc1, adcBuffer, 2);
 
 	
@@ -143,7 +136,6 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -410,19 +402,23 @@ void printToTheLCD() {
 			
 		}
 		
+		
+		
 	
 }
 
 void checkMoisture() {
 	
 			if (soilHumidity > 10 && soilHumidity < 50) {
-			moisture_pin = GPIO_PIN_15;
 			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_RESET);
+			moisture_pin = GPIO_PIN_15;
+
 			}
 			
 			else {
-			moisture_pin = GPIO_PIN_14;
 			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, GPIO_PIN_RESET);
+			moisture_pin = GPIO_PIN_14;
+
 			}
 }
 	
@@ -430,24 +426,12 @@ void checkMoisture() {
 
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
-
-//		if(hadc == &hadc1) {
-//			
-//			uint32_t newValue = HAL_ADC_GetValue(&hadc1);
-//			if (newValue - adcMoistureValue < 50) {
-//				return;
-//			}
-//			adcMoistureValue = newValue;
-//			soilHumidity = (100*((float)adcMoistureValue/4096));				
-//			
-//		}
-//		
+	
 	
 			if (hadc->Instance == ADC1) {
 				
 				adcMoistureValue = adcBuffer[0];
 				adcWaterValue = adcBuffer[1];
-				counter++;
 				
 				waterLevel = (100*((float)adcWaterValue/4096));
 				soilHumidity = (100*((float)adcMoistureValue/4096));
